@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 /* ══════════════════════════════════════════════════════════════
    아하철 × MUSINSA 다크 — 무신사 레이아웃 + 아하철 다크 컬러
@@ -9,7 +9,7 @@ import { useState, useRef, useEffect } from "react";
    ══════════════════════════════════════════════════════════════ */
 
 // ── 컬러 시스템 (원본 아하철 다크 테마) ─────────────────────────
-const C = {
+export const C = {
   primary:  '#00BAF6',
   keyColor: '#2ACF6C',
   brand:    '#2EE477',
@@ -78,7 +78,7 @@ const LIGHT_C = {
 
 // 전역 테마 상태 (Object.assign 뮤테이션 방식)
 let __isDark = true;
-function applyTheme(dark) {
+export function applyTheme(dark) {
   __isDark = dark;
   const src = dark ? DARK_C : LIGHT_C;
   Object.assign(C, src);
@@ -88,7 +88,7 @@ function applyTheme(dark) {
   C.risk = DARK_C.risk;
 }
 
-const FF = "'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif";
+export const FF = "'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif";
 const cColor = v => v >= 80 ? C.red : v >= 60 ? '#F0A500' : C.keyColor;
 const cLabel = v => v >= 80 ? '매우혼잡' : v >= 60 ? '혼잡' : v >= 40 ? '보통' : '원활';
 
@@ -11049,7 +11049,7 @@ const DEFAULT_STATION_DETAIL = {
   ],
 };
 
-function StationDetailScreen({ station, onBack, onPostDetail, onUser }) {
+export function StationDetailScreen({ station, onBack, onPostDetail, onUser }) {
   const detail = STATION_DETAIL_DB[station.name] ?? DEFAULT_STATION_DETAIL;
   const [activeDir,       setActiveDir]       = React.useState(0);
   const [showReviewWrite, setShowReviewWrite] = React.useState(false);
@@ -11622,7 +11622,7 @@ const SEARCH_STATIONS = [
   { name:'강남구청역', lineId:'7',   desc:'7호선',                          posts:29  },
 ];
 
-function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery }) {
+export function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery, onQueryChange }) {
   const [query, setQuery]             = useState(initialQuery || '');
   const [resultTab, setResultTab]     = useState('전체');
   const [recentList, setRecentList]   = useState([
@@ -11641,6 +11641,10 @@ function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery })
     }, 120);
     return () => clearTimeout(t);
   }, []);
+
+  React.useEffect(() => {
+    setQuery(initialQuery || '');
+  }, [initialQuery]);
 
   const lineColor = id => C.line[id] ?? C.primary;
   const shortName = id => {
@@ -11697,7 +11701,11 @@ function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery })
   /* ── 최근 검색어 ── */
   const addRecent    = w => setRecentList(p => [w, ...p.filter(x => x!==w)].slice(0,8));
   const removeRecent = w => setRecentList(p => p.filter(x => x!==w));
-  const doSearch     = w => { setQuery(w); addRecent(w); };
+  const doSearch     = w => {
+    setQuery(w);
+    onQueryChange && onQueryChange(w);
+    addRecent(w);
+  };
 
   const RESULT_TABS = ['전체','게시글','역','사용자'];
   const TAB_COUNT   = {
@@ -11757,7 +11765,11 @@ function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery })
             </svg>
             <input ref={inputRef}
               value={query}
-              onChange={e => { setQuery(e.target.value); setResultTab('전체'); }}
+              onChange={e => {
+                setQuery(e.target.value);
+                onQueryChange && onQueryChange(e.target.value);
+                setResultTab('전체');
+              }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && query.trim()) doSearch(query.trim());
               }}
@@ -11766,7 +11778,10 @@ function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery })
                 fontSize:14, color:C.white, fontFamily:FF }}
             />
             {query && (
-              <button onClick={() => setQuery('')}
+              <button onClick={() => {
+                  setQuery('');
+                  onQueryChange && onQueryChange('');
+                }}
                 style={{ background:'rgba(255,255,255,0.15)', border:'none',
                   borderRadius:10, width:18, height:18, flexShrink:0,
                   display:'flex', alignItems:'center', justifyContent:'center',
@@ -12287,7 +12302,7 @@ function SearchScreen({ onBack, onStation, onPostDetail, onUser, initialQuery })
   );
 }
 
-function HomeScreen({ isDark = true }) {
+export function HomeScreen({ isDark = true, onOpenSearch }) {
   const [voted, setVoted]               = useState(null);
   const [tab, setTab]                   = useState('추천');
   const [storyViewer,   setStoryViewer]   = useState(null);   // { stories, startIndex }
@@ -12299,8 +12314,6 @@ function HomeScreen({ isDark = true }) {
   const [showNotif,         setShowNotif]         = useState(false);
   const [showChat,          setShowChat]          = useState(false);
   const [chatRoom,          setChatRoom]          = useState(null);
-  const [showSearch,        setShowSearch]        = useState(false);
-  const [searchQuery,       setSearchQuery]       = useState('');
   const [showReviewList,    setShowReviewList]    = useState(false);
   const [showLangExchange,  setShowLangExchange]  = useState(false);
   const [showCrewList,      setShowCrewList]      = useState(false);
@@ -12346,7 +12359,6 @@ function HomeScreen({ isDark = true }) {
   if (userProfile)       return <UserProfileScreen  nick={userProfile}    onBack={() => setUserProfile(null)} />;
   if (postDetail)        return <PostDetailScreen   post={postDetail}     onBack={() => setPostDetail(null)}
     onUser={nick => { setPostDetail(null); setUserProfile(nick); }} />;
-  if (showSearch)        return <SearchScreen        initialQuery={searchQuery} onBack={() => { setShowSearch(false); setSearchQuery(''); }} onStation={s => { setShowSearch(false); setSearchQuery(''); setStationDetail(s); }} onPostDetail={p => { setShowSearch(false); setSearchQuery(''); setPostDetail(p); }} onUser={nick => { setShowSearch(false); setSearchQuery(''); setUserProfile(nick); }} />;
   if (showReviewList)    return <StationReviewListScreen onBack={() => setShowReviewList(false)} onWrite={() => { setShowReviewList(false); }} />;
   if (showLangExchange)  return <LanguageExchangeScreen  onBack={() => setShowLangExchange(false)} onChatStart={r => { setShowLangExchange(false); setChatRoom(r); }} />;
   if (showCrewList)      return <CrewListScreen          onBack={() => setShowCrewList(false)} onCrewDetail={crew => { setShowCrewList(false); setCrewDetail(crew); }} />;
@@ -12366,7 +12378,7 @@ function HomeScreen({ isDark = true }) {
       )}
 
       <AppHeader
-        onSearch={() => setShowSearch(true)}
+        onSearch={() => onOpenSearch && onOpenSearch('')}
         onNotif={() => setShowNotif(true)}
         onChat={() => setShowChat(true)}
         notifCount={notifCount}
@@ -12450,7 +12462,7 @@ function HomeScreen({ isDark = true }) {
       <Div8 h={16} />
 
       {/* ⑦ 인기 검색어 */}
-      <TrendingSection onSearch={kw => { setSearchQuery(kw); setShowSearch(true); }} />
+      <TrendingSection onSearch={kw => onOpenSearch && onOpenSearch(kw)} />
 
       <Div8 h={16} />
 
@@ -12934,7 +12946,7 @@ function SubwayMapOverlay({ onClose }) {
 /* ═══════════════════════════════════════════════════════
    지하철 화면 (무신사 카테고리 + 다크)
    ═══════════════════════════════════════════════════════ */
-function SubwayScreen() {
+export function SubwayScreen() {
   const [selected,      setSelected]      = useState(null);
   const [showSubwayMap, setShowSubwayMap] = useState(false);
 
@@ -13249,7 +13261,7 @@ const USER_DATA = {
 /* ═══════════════════════════════════════════════════════
    유저 프로필 화면 — 무신사 스타일
    ═══════════════════════════════════════════════════════ */
-function UserProfileScreen({ nick, onBack }) {
+export function UserProfileScreen({ nick, onBack }) {
   const [followed,  setFollowed]  = useState(false);
   const [tab,       setTab]       = useState('게시글');
 
@@ -13434,7 +13446,7 @@ function UserProfileScreen({ nick, onBack }) {
   );
 }
 
-function PostDetailScreen({ post, onBack, onUser }) {
+export function PostDetailScreen({ post, onBack, onUser }) {
   const [liked,       setLiked]       = useState(false);
   const [bookmarked,  setBookmarked]  = useState(false);
   const [sort,        setSort]        = useState('인기순');
@@ -14076,7 +14088,7 @@ function PostWriteScreen({ onBack, onPublish }) {
   );
 }
 
-function CommunityScreen() {
+export function CommunityScreen() {
   const [selectedPost,  setSelectedPost]  = useState(null);
   const [selectedUser,  setSelectedUser]  = useState(null);
   const [showWrite,     setShowWrite]     = useState(false);
@@ -15012,7 +15024,7 @@ function LostWriteScreen({ onBack, onSubmit }) {
   );
 }
 
-function LostScreen() {
+export function LostScreen() {
   const [statusFilter, setStatusFilter] = useState('전체');
   const [viewMode,     setViewMode]     = useState('grid'); // 'grid' | 'list'
   const [selectedItem, setSelectedItem] = useState(null);   // 상세 화면
@@ -16529,7 +16541,7 @@ function SettingScreen({ onBack, onEditProfile, onFavEdit, isDark, themeMode, on
   );
 }
 
-function MyScreen({ isDark, themeMode, onThemeMode }) {
+export function MyScreen({ isDark, themeMode, onThemeMode }) {
   const [actSubTab,    setActSubTab]    = useState('좋아요');
   const [selectedPost, setSelectedPost] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
