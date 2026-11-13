@@ -1,0 +1,19 @@
+package backend.team.ahachul_backend.api.member.application.port.out
+
+import backend.team.ahachul_backend.api.member.application.command.SearchMemberCommand
+import backend.team.ahachul_backend.api.member.domain.entity.MemberEntity
+
+interface MemberReader {
+
+    fun getMember(memberId: Long): MemberEntity
+
+    fun getMemberByNickname(nickname: String): MemberEntity
+
+    fun findMember(providerUserId: String): MemberEntity?
+
+    fun existMember(nickname: String): Boolean
+
+    fun existMemberByNicknameExceptMemberId(nickname: String, memberId: Long): Boolean
+
+    fun searchMembers(command: SearchMemberCommand): List<MemberEntity>
+}

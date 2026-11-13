@@ -1,0 +1,269 @@
+package backend.team.ahachul_backend.api.lost.adapter.web.`in`
+
+import backend.team.ahachul_backend.api.comment.adapter.web.`in`.dto.CreateCommentDto
+import backend.team.ahachul_backend.api.comment.adapter.web.`in`.dto.DeleteCommentDto
+import backend.team.ahachul_backend.api.comment.adapter.web.`in`.dto.GetCommentsDto
+import backend.team.ahachul_backend.api.comment.adapter.web.`in`.dto.UpdateCommentDto
+import backend.team.ahachul_backend.api.comment.application.port.`in`.CommentUseCase
+import backend.team.ahachul_backend.api.comment.domain.model.CommentType
+import backend.team.ahachul_backend.config.controller.CommonDocsTestConfig
+import org.junit.jupiter.api.Test
+import org.mockito.BDDMockito.given
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.http.MediaType
+import org.springframework.restdocs.headers.HeaderDocumentation.headerWithName
+import org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders
+import org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document
+import org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.delete
+import org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get
+import org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.patch
+import org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post
+import org.springframework.restdocs.payload.JsonFieldType
+import org.springframework.restdocs.payload.PayloadDocumentation
+import org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath
+import org.springframework.restdocs.request.RequestDocumentation.*
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.LocalDateTime
+
+@WebMvcTest(LostPostCommentController::class)
+class LostPostCommentControllerDocsTest : CommonDocsTestConfig() {
+
+    @MockBean
+    lateinit var commentUseCase: CommentUseCase
+
+    @Test
+    fun getLostPostCommentsTest() {
+        // given
+        val response = GetCommentsDto.Response(
+            listOf(
+                GetCommentsDto.CommentList(
+                    parentComment = GetCommentsDto.Comment(
+                        id = 1,
+                        upperCommentId = null,
+                        content = "상위 내용",
+                        imageUrls = listOf("https://cdn.ahhachul.com/comment/lost-parent.gif"),
+                        status = CommentType.CREATED,
+                        createdAt = LocalDateTime.now(),
+                        createdBy = "작성자 ID",
+                        writer = "작성자 닉네임",
+                        isPrivate = true,
+                        likeCnt = 0L,
+                    ),
+                    childComments = listOf(
+                        GetCommentsDto.Comment(
+                            id = 2,
+                            upperCommentId = 1,
+                            content = "하위 내용",
+                            imageUrls = listOf("https://cdn.ahhachul.com/comment/lost-child.png"),
+                            status = CommentType.CREATED,
+                            createdAt = LocalDateTime.now(),
+                            createdBy = "작성자 ID",
+                            writer = "작성자 닉네임",
+                            isPrivate = false,
+                            likeCnt = 0L,
+                        )
+                    )
+                )
+            )
+        )
+
+        given(commentUseCase.getComments(any()))
+            .willReturn(response)
+
+        // when
+        val result = mockMvc.perform(
+            get("/v1/lost-posts/{lostId}/comments", 1L)
+                .queryParam("sort", "createdAt,desc")
+                .accept(MediaType.APPLICATION_JSON)
+        )
+
+        // then
+        result.andExpect(status().isOk)
+            .andDo(
+                document(
+                    "get-lost-post-comments",
+                    getDocsRequest(),
+                    getDocsResponse(),
+                    pathParameters(
+                        parameterWithName("lostId").description("코멘트 조회할 유실물 아이디")
+                    ),
+                    queryParameters(
+                        parameterWithName("sort").description("정렬 조건").attributes(getFormatAttribute("(likes|createdAt),(asc|desc)")),
+                    ),
+                    PayloadDocumentation.responseFields(
+                        *commonResponseFields(),
+                        fieldWithPath("result.comments[].parentComment.id").type(JsonFieldType.NUMBER).description("코멘트 아이디"),
+                        fieldWithPath("result.comments[].parentComment.upperCommentId").type(JsonFieldType.NUMBER).description("상위 코멘트 아이디").optional(),
+                        fieldWithPath("result.comments[].parentComment.content").type(JsonFieldType.STRING).description("코멘트 내용"),
+                        fieldWithPath("result.comments[].parentComment.imageUrls").type(JsonFieldType.ARRAY).description("코멘트 이미지 URL 목록"),
+                        fieldWithPath("result.comments[].parentComment.status").type("CommentType").description("코멘트 상태").attributes(getFormatAttribute("CREATED, DELETED")),
+                        fieldWithPath("result.comments[].parentComment.createdAt").type("LocalDateTime").description("작성일자"),
+                        fieldWithPath("result.comments[].parentComment.createdBy").type(JsonFieldType.STRING).description("작성자 ID"),
+                        fieldWithPath("result.comments[].parentComment.writer").type(JsonFieldType.STRING).description("작성자 닉네임"),
+                        fieldWithPath("result.comments[].parentComment.isPrivate").type(JsonFieldType.BOOLEAN).description("비공개 여부").optional(),
+                        fieldWithPath("result.comments[].parentComment.likeCnt").type(JsonFieldType.NUMBER).description("좋아요 수"),
+                        fieldWithPath("result.comments[].parentComment.likedByMe").type(JsonFieldType.BOOLEAN).description("로그인 사용자 좋아요 여부"),
+                        fieldWithPath("result.comments[].childComments[].id").type(JsonFieldType.NUMBER).description("코멘트 아이디"),
+                        fieldWithPath("result.comments[].childComments[].upperCommentId").type(JsonFieldType.NUMBER).description("상위 코멘트 아이디").optional(),
+                        fieldWithPath("result.comments[].childComments[].content").type(JsonFieldType.STRING).description("코멘트 내용"),
+                        fieldWithPath("result.comments[].childComments[].imageUrls").type(JsonFieldType.ARRAY).description("코멘트 이미지 URL 목록"),
+                        fieldWithPath("result.comments[].childComments[].status").type("CommentType").description("코멘트 상태").attributes(getFormatAttribute("CREATED, DELETED")),
+                        fieldWithPath("result.comments[].childComments[].createdAt").type("LocalDateTime").description("작성일자"),
+                        fieldWithPath("result.comments[].childComments[].createdBy").type(JsonFieldType.STRING).description("작성자 ID"),
+                        fieldWithPath("result.comments[].childComments[].writer").type(JsonFieldType.STRING).description("작성자 닉네임"),
+                        fieldWithPath("result.comments[].childComments[].isPrivate").type(JsonFieldType.BOOLEAN).description("비공개 여부").optional(),
+                        fieldWithPath("result.comments[].childComments[].likeCnt").type(JsonFieldType.NUMBER).description("좋아요 수"),
+                        fieldWithPath("result.comments[].childComments[].likedByMe").type(JsonFieldType.BOOLEAN).description("로그인 사용자 좋아요 여부"),
+                        )
+                )
+            )
+    }
+
+    @Test
+    fun createLostPostCommentTest() {
+        // given
+        val response = CreateCommentDto.Response(
+            id = 3,
+            upperCommentId = 2,
+            content = "생성된 유실물 코멘트 내용",
+            imageUrls = listOf("https://cdn.ahhachul.com/comment/new-lost.gif"),
+        )
+
+        given(commentUseCase.createComment(any()))
+            .willReturn(response)
+
+        val request = CreateCommentDto.Request(
+            upperCommentId = 2,
+            content = "생성할 유실물 코멘트 내용",
+            isPrivate = null,
+        )
+
+        // when
+        val result = mockMvc.perform(
+            post("/v1/lost-posts/{lostId}/comments", 1L)
+                .header("Authorization", "Bearer <Access Token>")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .accept(MediaType.APPLICATION_JSON)
+        )
+
+        // then
+        result.andExpect(status().isOk)
+            .andDo(
+                document(
+                    "create-lost-post-comment",
+                    getDocsRequest(),
+                    getDocsResponse(),
+                    pathParameters(
+                        parameterWithName("lostId").description("코멘트 생성할 유실물 아이디")
+                    ),
+                    requestHeaders(
+                        headerWithName("Authorization").description("엑세스 토큰")
+                    ),
+                    PayloadDocumentation.requestFields(
+                        fieldWithPath("upperCommentId").type(JsonFieldType.NUMBER).description("상위 코멘트 아이디").optional(),
+                        fieldWithPath("content").type(JsonFieldType.STRING).description("생성할 내용"),
+                        fieldWithPath("imageUrls").type(JsonFieldType.ARRAY).description("첨부 이미지 URL 목록").optional(),
+                        fieldWithPath("isPrivate").type(JsonFieldType.BOOLEAN).description("비공개 여부").optional()
+                    ),
+                    PayloadDocumentation.responseFields(
+                        *commonResponseFields(),
+                        fieldWithPath("result.id").type(JsonFieldType.NUMBER).description("생성된 코멘트 아이디"),
+                        fieldWithPath("result.upperCommentId").type(JsonFieldType.NUMBER).description("연결된 상위 코멘트 아이디").optional(),
+                        fieldWithPath("result.content").type(JsonFieldType.STRING).description("생성된 내용"),
+                        fieldWithPath("result.imageUrls").type(JsonFieldType.ARRAY).description("생성된 이미지 URL 목록"),
+                    )
+                )
+            )
+    }
+
+    @Test
+    fun updateLostPostCommentTest() {
+        // given
+        val response = UpdateCommentDto.Response(
+            id = 2,
+            content = "수정된 유실물 코멘트 내용"
+        )
+
+        given(commentUseCase.updateComment(any()))
+            .willReturn(response)
+
+        val request = UpdateCommentDto.Request(
+            content = "수정할 유실물 코멘트 내용"
+        )
+
+        // when
+        val result = mockMvc.perform(
+            patch("/v1/lost-posts/{lostId}/comments/{commentId}", 1L, 2L)
+                .header("Authorization", "Bearer <Access Token>")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .accept(MediaType.APPLICATION_JSON)
+        )
+
+        // then
+        result.andExpect(status().isOk)
+            .andDo(
+                document(
+                    "update-lost-post-comment",
+                    getDocsRequest(),
+                    getDocsResponse(),
+                    pathParameters(
+                        parameterWithName("lostId").description("코멘트가 속한 유실물 아이디"),
+                        parameterWithName("commentId").description("수정할 코멘트 아이디")
+                    ),
+                    requestHeaders(
+                        headerWithName("Authorization").description("엑세스 토큰")
+                    ),
+                    PayloadDocumentation.requestFields(
+                        fieldWithPath("content").type(JsonFieldType.STRING).description("수정할 내용"),
+                    ),
+                    PayloadDocumentation.responseFields(
+                        *commonResponseFields(),
+                        fieldWithPath("result.id").type(JsonFieldType.NUMBER).description("수정된 코멘트 아이디"),
+                        fieldWithPath("result.content").type(JsonFieldType.STRING).description("수정된 내용"),
+                    )
+                )
+            )
+    }
+
+    @Test
+    fun deleteLostPostCommentTest() {
+        // given
+        val response = DeleteCommentDto.Response(
+            id = 2
+        )
+
+        given(commentUseCase.deleteComment(any()))
+            .willReturn(response)
+
+        // when
+        val result = mockMvc.perform(
+            delete("/v1/lost-posts/{lostId}/comments/{commentId}", 1L, 2L)
+                .header("Authorization", "Bearer <Access Token>")
+                .accept(MediaType.APPLICATION_JSON)
+        )
+
+        // then
+        result.andExpect(status().isOk)
+            .andDo(
+                document(
+                    "delete-lost-post-comment",
+                    getDocsRequest(),
+                    getDocsResponse(),
+                    pathParameters(
+                        parameterWithName("lostId").description("코멘트가 속한 유실물 아이디"),
+                        parameterWithName("commentId").description("삭제할 코멘트 아이디")
+                    ),
+                    requestHeaders(
+                        headerWithName("Authorization").description("엑세스 토큰")
+                    ),
+                    PayloadDocumentation.responseFields(
+                        *commonResponseFields(),
+                        fieldWithPath("result.id").type(JsonFieldType.NUMBER).description("삭제된 코멘트 아이디"),
+                    )
+                )
+            )
+    }
+}

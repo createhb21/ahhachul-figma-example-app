@@ -1,0 +1,14 @@
+package backend.team.ahachul_backend.common.client
+
+import backend.team.ahachul_backend.common.client.dto.StationTimesDto
+import backend.team.ahachul_backend.common.dto.RealtimePositionResponseDto
+import backend.team.ahachul_backend.common.dto.TrainRealTimeDto
+
+interface SeoulTrainClient {
+
+    fun getTrainRealTimes(stationName: String, startIndex: Int, endIndex: Int): TrainRealTimeDto
+
+    fun getStationTimesByApi(request: StationTimesDto.Request): StationTimesDto.Response
+
+    fun getRealtimePositions(subwayLineName: String): RealtimePositionResponseDto
+}

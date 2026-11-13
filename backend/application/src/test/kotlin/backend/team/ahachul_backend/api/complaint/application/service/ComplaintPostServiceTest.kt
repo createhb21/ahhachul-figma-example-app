@@ -1,0 +1,436 @@
+package backend.team.ahachul_backend.api.complaint.application.service
+
+import backend.team.ahachul_backend.api.common.adapter.web.out.StationRepository
+import backend.team.ahachul_backend.api.common.adapter.web.out.SubwayLineStationRepository
+import backend.team.ahachul_backend.api.common.domain.entity.StationEntity
+import backend.team.ahachul_backend.api.common.domain.entity.SubwayLineStationEntity
+import backend.team.ahachul_backend.api.complaint.adapter.out.ComplaintPostRepository
+import backend.team.ahachul_backend.api.complaint.application.command.`in`.CreateComplaintPostCommand
+import backend.team.ahachul_backend.api.complaint.application.command.`in`.SearchComplaintPostCommand
+import backend.team.ahachul_backend.api.complaint.application.command.`in`.UpdateComplaintPostCommand
+import backend.team.ahachul_backend.api.complaint.application.command.`in`.UpdateComplaintPostStatusCommand
+import backend.team.ahachul_backend.api.complaint.application.port.`in`.ComplaintPostUseCase
+import backend.team.ahachul_backend.api.complaint.domain.entity.ComplaintPostEntity
+import backend.team.ahachul_backend.api.complaint.domain.model.ComplaintPostType
+import backend.team.ahachul_backend.api.complaint.domain.model.ComplaintType
+import backend.team.ahachul_backend.api.complaint.domain.model.ShortContentType
+import backend.team.ahachul_backend.api.member.adapter.web.out.MemberRepository
+import backend.team.ahachul_backend.api.member.domain.entity.MemberEntity
+import backend.team.ahachul_backend.api.member.domain.model.GenderType
+import backend.team.ahachul_backend.api.member.domain.model.MemberStatusType
+import backend.team.ahachul_backend.api.member.domain.model.ProviderType
+import backend.team.ahachul_backend.common.domain.entity.SubwayLineEntity
+import backend.team.ahachul_backend.common.domain.model.RegionType
+import backend.team.ahachul_backend.common.persistence.SubwayLineRepository
+import backend.team.ahachul_backend.common.utils.RequestUtils
+import backend.team.ahachul_backend.config.controller.CommonServiceTestConfig
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+
+class ComplaintPostServiceTest(
+    @Autowired val complaintPostUseCase: ComplaintPostUseCase,
+    @Autowired val complaintPostRepository: ComplaintPostRepository,
+    @Autowired val memberRepository: MemberRepository,
+    @Autowired val subwayLineRepository: SubwayLineRepository,
+    @Autowired val stationRepository: StationRepository,
+    @Autowired val subwayLineStationRepository: SubwayLineStationRepository,
+) : CommonServiceTestConfig() {
+
+    lateinit var member: MemberEntity
+    lateinit var subwayLine: SubwayLineEntity
+    lateinit var subwayLine2: SubwayLineEntity
+
+    @BeforeEach
+    fun setUp() {
+        member = memberRepository.save(
+            MemberEntity(
+                nickname = "nickname",
+                provider = ProviderType.GOOGLE,
+                providerUserId = "providerUserId",
+                email = "email",
+                gender = GenderType.MALE,
+                ageRange = "20",
+                status = MemberStatusType.ACTIVE
+            )
+        )
+        member.id.let { RequestUtils.setAttribute(RequestUtils.Attribute.MEMBER_ID, it)}
+        subwayLine = subwayLineRepository.save(
+            SubwayLineEntity(
+                name = "1호선",
+                regionType = RegionType.METROPOLITAN
+            )
+        )
+        subwayLine2 = subwayLineRepository.save(
+            SubwayLineEntity(
+                name = "2호선",
+                regionType = RegionType.METROPOLITAN
+            )
+        )
+    }
+
+    @Test
+    fun 민원_조회_지하철_노선() {
+        // given
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost = ComplaintPostEntity.of(createComplaintPostCommand, member, subwayLine)
+        complaintPostRepository.save(complaintPost)
+
+        // when
+        val searchComplaintPostCommand = SearchComplaintPostCommand(
+            subwayLineIds = listOf(subwayLine.id),
+            stationId = null,
+            keyword = null,
+            pageToken = null,
+            pageSize = 10
+        )
+        val searchComplaintPosts = complaintPostUseCase.searchComplaintPosts(searchComplaintPostCommand)
+
+        // then
+        assertThat(searchComplaintPosts.data).hasSize(1)
+        assertThat(searchComplaintPosts.data[0].id).isEqualTo(complaintPost.id)
+        assertThat(searchComplaintPosts.data[0].content).isEqualTo(complaintPost.content)
+    }
+
+    @Test
+    fun 민원_조회_키워드() {
+        // given
+        val createComplaintPostCommand1 = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val createComplaintPostCommand2 = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "123",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost1 = ComplaintPostEntity.of(createComplaintPostCommand1, member, subwayLine)
+        val complaintPost2 = ComplaintPostEntity.of(createComplaintPostCommand2, member, subwayLine)
+        complaintPostRepository.save(complaintPost1)
+        complaintPostRepository.save(complaintPost2)
+
+        // when
+        val searchComplaintPostCommand = SearchComplaintPostCommand(
+            subwayLineIds = listOf(subwayLine.id),
+            stationId = null,
+            keyword = "용",
+            pageToken = null,
+            pageSize = 10
+        )
+        val searchComplaintPosts = complaintPostUseCase.searchComplaintPosts(searchComplaintPostCommand)
+
+        // then
+        assertThat(searchComplaintPosts.data).hasSize(1)
+        assertThat(searchComplaintPosts.data[0].id).isEqualTo(complaintPost1.id)
+        assertThat(searchComplaintPosts.data[0].content).isEqualTo(complaintPost1.content)
+    }
+
+    @Test
+    fun 민원_조회_즐겨찾는_역() {
+        // given
+        val createComplaintPostCommand1 = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val createComplaintPostCommand2 = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "123",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine2.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost1 = ComplaintPostEntity.of(createComplaintPostCommand1, member, subwayLine)
+        val complaintPost2 = ComplaintPostEntity.of(createComplaintPostCommand2, member, subwayLine2)
+        complaintPostRepository.save(complaintPost1)
+        complaintPostRepository.save(complaintPost2)
+
+        // when
+        val searchComplaintPostCommand = SearchComplaintPostCommand(
+            subwayLineIds = listOf(subwayLine.id, subwayLine2.id),
+            stationId = null,
+            keyword = null,
+            pageToken = null,
+            pageSize = 10
+        )
+        val searchComplaintPosts = complaintPostUseCase.searchComplaintPosts(searchComplaintPostCommand)
+
+        // then
+        assertThat(searchComplaintPosts.data).hasSize(2)
+        assertThat(searchComplaintPosts.data[0].id).isEqualTo(complaintPost2.id)
+        assertThat(searchComplaintPosts.data[0].content).isEqualTo(complaintPost2.content)
+        assertThat(searchComplaintPosts.data[1].id).isEqualTo(complaintPost1.id)
+        assertThat(searchComplaintPosts.data[1].content).isEqualTo(complaintPost1.content)
+    }
+
+    @Test
+    fun 민원_조회_역_필터_교집합() {
+        // given
+        val station = stationRepository.save(StationEntity(name = "테스트역"))
+        subwayLineStationRepository.save(
+            SubwayLineStationEntity(
+                station = station,
+                subwayLine = subwayLine
+            )
+        )
+
+        val createPrimaryLinePost = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "1호선 내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            stationId = station.id,
+            imageFiles = listOf(),
+        )
+        val createSecondaryLinePost = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "2호선 내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine2.id,
+            imageFiles = listOf(),
+        )
+
+        val primaryPost = complaintPostRepository.save(
+            ComplaintPostEntity.of(createPrimaryLinePost, member, subwayLine, station)
+        )
+        complaintPostRepository.save(
+            ComplaintPostEntity.of(createSecondaryLinePost, member, subwayLine2)
+        )
+
+        val stationOnlyCommand = SearchComplaintPostCommand(
+            subwayLineIds = null,
+            stationId = station.id,
+            keyword = null,
+            pageToken = null,
+            pageSize = 10
+        )
+        val mismatchCommand = SearchComplaintPostCommand(
+            subwayLineIds = listOf(subwayLine2.id),
+            stationId = station.id,
+            keyword = null,
+            pageToken = null,
+            pageSize = 10
+        )
+
+        // when
+        val stationOnlyResult = complaintPostUseCase.searchComplaintPosts(stationOnlyCommand)
+        val mismatchResult = complaintPostUseCase.searchComplaintPosts(mismatchCommand)
+
+        // then
+        assertThat(stationOnlyResult.data).hasSize(1)
+        assertThat(stationOnlyResult.data.first().id).isEqualTo(primaryPost.id)
+        assertThat(mismatchResult.data).isEmpty()
+    }
+
+    @Test
+    fun 민원_상세_조회() {
+        // given
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost = ComplaintPostEntity.of(createComplaintPostCommand, member, subwayLine)
+        complaintPostRepository.save(complaintPost)
+
+        // when
+        val getComplaintPost = complaintPostUseCase.getComplaintPost(complaintPost.id)
+
+        // then
+        assertThat(getComplaintPost.id).isEqualTo(complaintPost.id)
+        assertThat(getComplaintPost.content).isEqualTo(complaintPost.content)
+        assertThat(getComplaintPost.complaintType).isEqualTo(complaintPost.complaintType)
+        assertThat(getComplaintPost.shortContentType).isEqualTo(complaintPost.shortContentType)
+    }
+
+    @Test
+    fun 민원_생성() {
+        // given
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        // when
+        val createComplaintPost = complaintPostUseCase.createComplaintPost(createComplaintPostCommand)
+
+        // then
+        assertThat(createComplaintPost.id).isNotNull()
+        assertThat(createComplaintPost.images).isEmpty()
+    }
+
+    @Test
+    fun 민원_생성_stationId_저장() {
+        // given
+        val station = stationRepository.save(StationEntity(name = "테스트역"))
+        subwayLineStationRepository.save(
+            SubwayLineStationEntity(
+                station = station,
+                subwayLine = subwayLine
+            )
+        )
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            stationId = station.id,
+            imageFiles = listOf(),
+        )
+
+        // when
+        val created = complaintPostUseCase.createComplaintPost(createComplaintPostCommand)
+        val saved = complaintPostRepository.findById(created.id).orElseThrow()
+
+        // then
+        assertThat(saved.station?.id).isEqualTo(station.id)
+    }
+
+    @Test
+    fun 민원_수정() {
+        // given
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost = ComplaintPostEntity.of(createComplaintPostCommand, member, subwayLine)
+        complaintPostRepository.save(complaintPost)
+
+        // when
+        val updateComplaintPostCommand = UpdateComplaintPostCommand(
+            id = complaintPost.id,
+            shortContentType = ShortContentType.SELF,
+            content = "내용 수정",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            complaintType = null,
+            subwayLineId = null,
+            status = null,
+            imageFiles = null,
+            removeFileIds = null,
+        )
+        complaintPostUseCase.updateComplaintPost(updateComplaintPostCommand)
+        val updatedComplaintPost = complaintPostRepository.findById(updateComplaintPostCommand.id).get()
+
+        // then
+        assertThat(updatedComplaintPost.shortContentType).isEqualTo(updateComplaintPostCommand.shortContentType)
+        assertThat(updatedComplaintPost.content).isEqualTo(updateComplaintPostCommand.content)
+    }
+
+    @Test
+    fun 민원_상태_수정() {
+        // given
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost = ComplaintPostEntity.of(createComplaintPostCommand, member, subwayLine)
+        complaintPostRepository.save(complaintPost)
+
+        // when
+        val updateComplaintPostStatusCommand = UpdateComplaintPostStatusCommand(
+            id = complaintPost.id,
+            status = ComplaintPostType.IN_PROGRESS,
+        )
+        complaintPostUseCase.updateComplaintPostStatus(updateComplaintPostStatusCommand)
+        val updatedComplaintPost = complaintPostRepository.findById(updateComplaintPostStatusCommand.id).get()
+
+        // then
+        assertThat(updatedComplaintPost.status).isEqualTo(updateComplaintPostStatusCommand.status)
+    }
+
+    @Test
+    fun 민원_삭제() {
+        // given
+        val createComplaintPostCommand = CreateComplaintPostCommand(
+            complaintType = ComplaintType.ENVIRONMENTAL_COMPLAINT,
+            shortContentType = ShortContentType.SELF,
+            content = "내용",
+            phoneNumber = null,
+            trainNo = null,
+            location = null,
+            subwayLineId = subwayLine.id,
+            imageFiles = listOf(),
+        )
+
+        val complaintPost = ComplaintPostEntity.of(createComplaintPostCommand, member, subwayLine)
+        complaintPostRepository.save(complaintPost)
+
+        // when
+        complaintPostUseCase.deleteComplaintPost(complaintPost.id)
+        val deleteComplaintPost = complaintPostRepository.findById(complaintPost.id).get()
+
+        // then
+        assertThat(deleteComplaintPost.status).isEqualTo(ComplaintPostType.DELETED)
+    }
+}
